@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Ambiente / segredos
+.venv/
+venv/
+.env
+
+# Dados enviados / relatórios gerados
+data/*
+!data/.gitkeep
+reports/*.pdf
+models/*.joblib
+!models/.gitkeep
+
+# Sistema
+.DS_Store

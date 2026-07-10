@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.github/
+data/*
+reports/*.pdf
+notebooks/
+*.ipynb
+.env
+.DS_Store
