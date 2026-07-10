@@ -81,7 +81,9 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = [str(c).strip() for c in df.columns]
 
     for col in df.columns:
-        if df[col].dtype == "object":
+        # Cobre object, string e category — o dtype de texto varia entre versões
+        # do pandas, então testamos "não numérico" em vez de "== object".
+        if not pd.api.types.is_numeric_dtype(df[col]):
             num = _coerce_numeric(df[col])
             # Só adota a conversão se a grande maioria virou número de fato.
             if len(num) and num.notna().mean() > 0.9:
