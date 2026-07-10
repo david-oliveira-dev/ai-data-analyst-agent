@@ -59,6 +59,22 @@ def load_csv(source: str | Path | bytes, sep: str | None = None) -> pd.DataFrame
     return clean(df)
 
 
+def _coerce_numeric(col: pd.Series) -> pd.Series:
+    """Tenta converter uma coluna de texto em número, tratando o padrão BR.
+
+    Só aplica a regra "'.' milhar / ',' decimal" quando há vírgula na coluna —
+    assim não corrompe decimais no padrão americano ("1234.56"). Usa regex
+    explícito (`\\.`) para remover o ponto, evitando ambiguidade entre versões
+    do pandas quanto ao default de `str.replace`.
+    """
+    s = col.astype(str).str.strip()
+    if s.str.contains(",", na=False).mean() > 0.5:            # padrão BR
+        candidate = s.str.replace(r"\.", "", regex=True).str.replace(",", ".", regex=False)
+    else:
+        candidate = s
+    return pd.to_numeric(candidate, errors="coerce")
+
+
 def clean(df: pd.DataFrame) -> pd.DataFrame:
     """Limpeza não destrutiva: nomes de coluna e tipos numéricos óbvios."""
     df = df.copy()
@@ -66,15 +82,10 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 
     for col in df.columns:
         if df[col].dtype == "object":
-            stripped = df[col].astype(str).str.strip()
-            # Tenta converter "1.234,56" (padrão BR) ou "1234.56" em número.
-            as_num = pd.to_numeric(
-                stripped.str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
-                errors="coerce",
-            )
+            num = _coerce_numeric(df[col])
             # Só adota a conversão se a grande maioria virou número de fato.
-            if stripped.notna().sum() and as_num.notna().mean() > 0.9:
-                df[col] = as_num
+            if len(num) and num.notna().mean() > 0.9:
+                df[col] = num
             else:
-                df[col] = stripped.replace({"": None, "nan": None})
+                df[col] = df[col].astype(str).str.strip().replace({"": None, "nan": None})
     return df
