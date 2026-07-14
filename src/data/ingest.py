@@ -59,19 +59,61 @@ def load_csv(source: str | Path | bytes, sep: str | None = None) -> pd.DataFrame
     return clean(df)
 
 
-def _coerce_numeric(col: pd.Series) -> pd.Series:
-    """Tenta converter uma coluna de texto em número, tratando o padrão BR.
+# Um valor é "só separador de milhar" quando os grupos batem certinho:
+# primeiro grupo de 1-3 dígitos sem zero à esquerda, seguido de grupos de 3.
+# Casa "1.234" e "1.234.567"; não casa "1234.56" (cauda de 2) nem "0.500".
+_THOUSANDS_ONLY = {
+    ".": r"[+-]?[1-9]\d{0,2}(?:\.\d{3})+",
+    ",": r"[+-]?[1-9]\d{0,2}(?:,\d{3})+",
+}
 
-    Só aplica a regra "'.' milhar / ',' decimal" quando há vírgula na coluna —
-    assim não corrompe decimais no padrão americano ("1234.56"). Usa regex
-    explícito (`\\.`) para remover o ponto, evitando ambiguidade entre versões
-    do pandas quanto ao default de `str.replace`.
+
+def _sniff_decimal_sep(s: pd.Series) -> str | None:
+    """Descobre o separador decimal da coluna: ',' (BR), '.' (US) ou None.
+
+    None significa "a coluna não tem casas decimais" — ou não há separador
+    algum, ou o que existe é separador de milhar.
+
+    A regra forte: quando '.' e ',' aparecem no MESMO número, o **último** é o
+    decimal — `1.234,56` -> ',' e `1,234.56` -> '.'. É o único sinal que
+    desambigua BR de US sem depender de locale.
+
+    Com um separador só, ele é de milhar apenas se TODOS os valores tiverem
+    formato de agrupamento (`1.234`); caso contrário é decimal (`1234.56`).
+    """
+    has = {sep: s.str.contains(sep, regex=False, na=False) for sep in (".", ",")}
+
+    both = s[has["."] & has[","]]
+    if len(both):
+        comma_is_last = both.str.rfind(",") > both.str.rfind(".")
+        return "," if comma_is_last.mean() > 0.5 else "."
+
+    for sep in (".", ","):
+        vals = s[has[sep]]
+        if not len(vals):
+            continue
+        if vals.str.fullmatch(_THOUSANDS_ONLY[sep]).all():
+            return None
+        return sep
+    return None
+
+
+def _coerce_numeric(col: pd.Series) -> pd.Series:
+    """Tenta converter uma coluna de texto em número, detectando BR ou US.
+
+    Detecta o formato pela coluna inteira (via `_sniff_decimal_sep`) e então
+    normaliza para o padrão que o `to_numeric` entende: remove o separador de
+    milhar e deixa '.' como decimal.
     """
     s = col.astype(str).str.strip()
-    if s.str.contains(",", na=False).mean() > 0.5:            # padrão BR
-        candidate = s.str.replace(r"\.", "", regex=True).str.replace(",", ".", regex=False)
-    else:
-        candidate = s
+    decimal = _sniff_decimal_sep(s)
+
+    if decimal == ",":                                        # BR: 1.234,56
+        candidate = s.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+    elif decimal == ".":                                      # US: 1,234.56
+        candidate = s.str.replace(",", "", regex=False)
+    else:                                                     # sem decimais: 1.234 / 1,234
+        candidate = s.str.replace(".", "", regex=False).str.replace(",", "", regex=False)
     return pd.to_numeric(candidate, errors="coerce")
 
 

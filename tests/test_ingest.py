@@ -26,6 +26,36 @@ def test_parses_brazilian_decimal():
     assert abs(df["valor"].iloc[0] - 1234.56) < 1e-6
 
 
+def test_parses_us_decimal():
+    csv = b"valor\n1234.56\n2000.00\n999.90"
+    df = load_csv(csv)
+    assert df["valor"].dtype.kind == "f"
+    assert abs(df["valor"].iloc[0] - 1234.56) < 1e-6
+
+
+def test_parses_us_thousands_separator():
+    """O ',' de milhar americano não pode virar decimal (1,234.56 != 1.23456)."""
+    csv = b"valor\n1,234.56\n2,000.00\n999.90"
+    df = load_csv(csv)
+    assert df["valor"].dtype.kind == "f"
+    assert abs(df["valor"].iloc[0] - 1234.56) < 1e-6
+
+
+def test_parses_thousands_without_decimals():
+    """Só separador de milhar, sem casas decimais: 1.234 é mil e duzentos e trinta e quatro."""
+    csv = b"valor\n1.234\n2.000\n1.234.567"
+    df = load_csv(csv)
+    assert df["valor"].iloc[0] == 1234
+    assert df["valor"].iloc[2] == 1234567
+
+
+def test_keeps_text_column_as_text():
+    csv = b"cidade\nSP\nRJ\nBH"
+    df = load_csv(csv)
+    assert df["cidade"].dtype.kind not in "fi"
+    assert df["cidade"].iloc[0] == "SP"
+
+
 def test_strips_column_names():
     df = clean(load_csv(b"  a , b \n1,2"))
     assert list(df.columns) == ["a", "b"]
