@@ -90,6 +90,34 @@ curl -X POST "http://localhost:8000/report" \
   Forest) e importância das variáveis.
 - **Narrativa executiva** escrita pela Claude (ou o resumo determinístico).
 
+## Exemplo de saída
+
+Rodando sobre uma base de assinaturas com defeitos plantados de propósito —
+12% de faltantes numa coluna, outliers de cobrança e duas variáveis redundantes:
+
+```bash
+python examples/gerar_exemplo.py
+```
+
+![Gráficos gerados pelo agente](reports/figures/exemplo_graficos.png)
+
+E a narrativa que sai (aqui pelo **fallback determinístico**, sem chave de API —
+é o mesmo caminho que o CI exercita):
+
+> ## Qualidade dos dados
+> - 1 coluna(s) com valores faltantes — a pior é `mensalidade` com 12.0% faltante.
+> - 3 coluna(s) com outliers pela regra do IQR.
+>
+> ## Modelagem preditiva
+> Alvo `cancelou` (classification): o melhor baseline foi **LogisticRegression**
+> (roc_auc = 0.8817). Variáveis mais influentes: chamados_suporte,
+> meses_de_casa, regiao.
+
+O agente recuperou exatamente o sinal que o script planta na base (cliente novo,
+com muitos chamados de suporte, cancela mais) — sem receber nenhuma dica sobre
+ele. O relatório completo em PDF fica em
+[`reports/exemplo_relatorio.pdf`](reports/exemplo_relatorio.pdf).
+
 ## Estrutura
 ```
 src/
