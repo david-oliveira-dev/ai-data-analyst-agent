@@ -19,3 +19,8 @@ models/*.joblib
 
 # Sistema
 .DS_Store
+
+# Contexto de build (mantidos localmente, fora do versionamento)
+BUILD_BRIEF.md
+CLAUDE.md
+.claude/
